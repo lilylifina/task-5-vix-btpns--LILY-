@@ -1,0 +1,115 @@
+package main
+
+import (
+	"log"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/mysql"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/asaskevich/govalidator"
+)
+
+// Struktur data pengguna
+type User struct {
+	gorm.Model
+	Username string `json:"username" valid:"required"`
+	Email    string `json:"email" valid:"email,required"`
+	Password string `json:"password" valid:"required,length(6|50)"`
+	Photos   []Photo
+}
+
+// Struktur data foto
+type Photo struct {
+	gorm.Model
+	Title    string `json:"title"`
+	Caption  string `json:"caption"`
+	PhotoURL string `json:"photoUrl"`
+	UserID   uint
+	User     User
+}
+
+// Struktur data token JWT
+type Token struct {
+	Token string `json:"token"`
+}
+
+func main() {
+	db, err := gorm.Open("mysql", "username:password@/dbname?charset=utf8mb4&parseTime=True&loc=Local")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// Migrasi basis data
+	db.AutoMigrate(&User{})
+	db.AutoMigrate(&Photo{})
+
+	r := gin.Default()
+
+	// Routing untuk User Endpoint
+	userGroup := r.Group("/users")
+	{
+		userGroup.POST("/register", registerUserHandler)
+		userGroup.POST("/login", loginUserHandler)
+		userGroup.PUT("/:userId", updateUserHandler)
+		userGroup.DELETE("/:userId", deleteUserHandler)
+	}
+
+	// Routing untuk Foto Endpoint
+	photoGroup := r.Group("/foto")
+	{
+		photoGroup.POST("/", createPhotoHandler)
+		photoGroup.GET("/", getPhotosHandler)
+		photoGroup.PUT("/:photoId", updatePhotoHandler)
+		photoGroup.DELETE("/:photoId", deletePhotoHandler)
+	}
+
+	log.Fatal(r.Run(":8080"))
+}
+
+func registerUserHandler(c *gin.Context) {
+	var newUser User
+	if err := c.ShouldBindJSON(&newUser); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validasi input
+	_, err := govalidator.ValidateStruct(newUser)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Lakukan operasi pendaftaran pengguna di database
+	// ...
+
+	c.JSON(http.StatusCreated, gin.H{"message": "User registered successfully"})
+}
+
+func loginUserHandler(c *gin.Context) {
+	var credentials struct {
+		Email    string `json:"email" valid:"email,required"`
+		Password string `json:"password" valid:"required"`
+	}
+	if err := c.ShouldBindJSON(&credentials); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validasi input
+	_, err := govalidator.ValidateStruct(credentials)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Lakukan operasi otentikasi pengguna
+	// ...
+
+	// Buat token JWT
+	token := jwt.New(jwt.SigningMethodHS256)
+	// Set claims
+	claims := token.Claims.(jwt.MapClaims
